@@ -1,10 +1,10 @@
-// Vercel Serverless Function — 通过 GitHub Gist 存储留言
+// Vercel Serverless Function — 通过 GitHub Gist 存储留言（CommonJS）
 const GIST_ID = '58f70ed7be349a8830bd97a1ed727500';
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GIST_RAW_URL = `https://gist.githubusercontent.com/dengkechen2002/${GIST_ID}/raw/messages.json`;
+const GIST_API_URL = `https://api.github.com/gists/${GIST_ID}`;
 
-export default async function handler(req, res) {
-  // CORS 头
+module.exports = async (req, res) => {
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -13,7 +13,6 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      // 读取留言
       const resp = await fetch(GIST_RAW_URL);
       if (!resp.ok) throw new Error('Gist read failed');
       const data = await resp.json();
@@ -24,13 +23,12 @@ export default async function handler(req, res) {
       const { name, content } = req.body || {};
       if (!content) return res.status(400).json({ error: '内容不能为空' });
 
-      // 读取当前数据
+      // 读当前数据
       const resp = await fetch(GIST_RAW_URL);
       if (!resp.ok) throw new Error('Gist read failed');
       const data = await resp.json();
       const messages = data.messages || [];
 
-      // 添加新留言
       messages.unshift({
         id: Date.now(),
         name: (name || '匿名').trim().slice(0, 20),
@@ -38,14 +36,13 @@ export default async function handler(req, res) {
         created_at: new Date().toISOString()
       });
 
-      // 限制保留最近 100 条
       if (messages.length > 100) messages.length = 100;
 
       // 写回 Gist
-      const updateResp = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      const updateResp = await fetch(GIST_API_URL, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
           'Content-Type': 'application/json',
           'Accept': 'application/vnd.github+json'
         },
@@ -71,4 +68,4 @@ export default async function handler(req, res) {
     console.error('API Error:', err);
     return res.status(500).json({ error: err.message });
   }
-}
+};
