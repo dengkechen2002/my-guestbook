@@ -35,7 +35,7 @@
 <body>
 
     <h1>📝 留言板</h1>
-    <p class="subtitle">用 Vercel + Supabase 免费搭建</p>
+    <p class="subtitle">用 Vercel + GitHub Gist 免费搭建</p>
 
     <div class="form">
         <input type="text" id="nameInput" placeholder="你的名字（可选）" maxlength="20" />
@@ -46,17 +46,13 @@
     <div id="messages"><div class="loading">⏳ 加载中...</div></div>
 
     <footer>
-        基于 <a href="https://vercel.com" target="_blank">Vercel</a> + <a href="https://supabase.com" target="_blank">Supabase</a> 构建
+        基于 <a href="https://vercel.com" target="_blank">Vercel</a> + <a href="https://gist.github.com" target="_blank">GitHub Gist</a> 构建
     </footer>
 
     <div id="toast" class="toast"></div>
 
     <script>
-        // ===== 请替换成你自己的 Supabase 项目信息 =====
-        const SUPABASE_URL = 'https://denytdtpgjvituxanphd.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_0oam9gPNEr24xu-KJq65fw_Chye0oZR';
-        // ============================================
-
+        const API_URL = '/api/messages';
         const toast = document.getElementById('toast');
 
         function showToast(msg) {
@@ -73,12 +69,7 @@
         async function loadMessages() {
             const container = document.getElementById('messages');
             try {
-                const res = await fetch(`${SUPABASE_URL}/rest/v1/messages?select=*&order=created_at.desc&limit=50`, {
-                    headers: {
-                        'apikey': SUPABASE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_KEY}`
-                    }
-                });
+                const res = await fetch(API_URL);
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
 
@@ -96,11 +87,7 @@
                     </div>
                 `).join('');
             } catch (err) {
-                if (err.message && err.message.includes('PGRST205')) {
-                    container.innerHTML = `<div class="empty">📦 数据库表还没创建<br/><small>请在 Supabase SQL Editor 运行建表脚本</small></div>`;
-                } else {
-                    container.innerHTML = `<div class="empty">😿 加载失败：${err.message}</div>`;
-                }
+                container.innerHTML = `<div class="empty">😿 加载失败：${err.message}</div>`;
             }
         }
 
@@ -112,14 +99,9 @@
 
             setLoading(true);
             try {
-                const res = await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+                const res = await fetch(API_URL, {
                     method: 'POST',
-                    headers: {
-                        'apikey': SUPABASE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_KEY}`,
-                        'Content-Type': 'application/json',
-                        'Prefer': 'return=minimal'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, content })
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
