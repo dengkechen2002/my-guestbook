@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>留言板</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 2rem; background: #f5f5f5; min-height: 100vh; display: flex; flex-direction: column; }
+        h1 { text-align: center; margin-bottom: .5rem; color: #333; }
+        .subtitle { text-align: center; color: #999; margin-bottom: 2rem; font-size: 14px; }
+        .form { display: flex; gap: 8px; margin-bottom: 2rem; flex-wrap: wrap; }
+        .form input { flex: 1; min-width: 120px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; outline: none; transition: border-color .2s; }
+        .form input:focus { border-color: #0070f3; }
+        .form button { padding: 10px 24px; background: #0070f3; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; transition: background .2s; }
+        .form button:hover { background: #0051b3; }
+        .form button:disabled { opacity: .5; cursor: not-allowed; }
+        #messages { flex: 1; }
+        .message { background: white; padding: 14px 18px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); transition: transform .15s; }
+        .message:hover { transform: translateX(4px); }
+        .message .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .message .name { font-weight: 600; color: #0070f3; font-size: 15px; }
+        .message .time { color: #aaa; font-size: 13px; }
+        .message .content { color: #444; line-height: 1.5; word-break: break-word; }
+        .empty { text-align: center; color: #bbb; padding: 4rem 0; font-size: 18px; }
+        .empty small { display: block; margin-top: 8px; font-size: 14px; color: #ddd; }
+        .loading { text-align: center; color: #aaa; padding: 3rem 0; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+        .toast.show { opacity: 1; }
+        footer { text-align: center; color: #ccc; font-size: 13px; margin-top: 2rem; padding: 1rem 0; }
+        footer a { color: #999; text-decoration: none; }
+        footer a:hover { color: #0070f3; }
+    </style>
+</head>
+<body>
+
+    <h1>📝 留言板</h1>
+    <p class="subtitle">用 Vercel + Supabase 免费搭建</p>
+
+    <div class="form">
+        <input type="text" id="nameInput" placeholder="你的名字（可选）" maxlength="20" />
+        <input type="text" id="msgInput" placeholder="说点什么..." maxlength="200" />
+        <button id="sendBtn" onclick="postMessage()">发送</button>
+    </div>
+
+    <div id="messages"><div class="loading">⏳ 加载中...</div></div>
+
+    <footer>
+        基于 <a href="https://vercel.com" target="_blank">Vercel</a> + <a href="https://supabase.com" target="_blank">Supabase</a> 构建
+    </footer>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // ===== 请替换成你自己的 Supabase 项目信息 =====
+        const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
+        const SUPABASE_KEY = 'YOUR_ANON_KEY';
+        // ============================================
+
+        const toast = document.getElementById('toast');
+
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function setLoading(loading) {
+            document.getElementById('sendBtn').disabled = loading;
+        }
+
+        // 读取留言
+        async function loadMessages() {
+            const container = document.getElementById('messages');
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/messages?select=*&order=created_at.desc&limit=50`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="empty">还没有留言<br/><small>快来写下第一条吧 🎉</small></div>';
+                    return;
+                }
+                container.innerHTML = data.map(m => `
+                    <div class="message">
+                        <div class="head">
+                            <span class="name">${escapeHtml(m.name || '匿名')}</span>
+                            <span class="time">${formatTime(m.created_at)}</span>
+                        </div>
+                        <div class="content">${escapeHtml(m.content)}</div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = `<div class="empty">😿 加载失败：${err.message}</div>`;
+            }
+        }
+
+        // 发布留言
+        async function postMessage() {
+            const name = document.getElementById('nameInput').value.trim() || '匿名';
+            const content = document.getElementById('msgInput').value.trim();
+            if (!content) return showToast('请输入内容');
+
+            setLoading(true);
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({ name, content })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                document.getElementById('msgInput').value = '';
+                showToast('✅ 留言成功！');
+                loadMessages();
+            } catch (err) {
+                showToast('❌ 发送失败：' + err.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // 按 Enter 发送
+        document.getElementById('msgInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') postMessage();
+        });
+
+        // 工具函数
+        function escapeHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        function formatTime(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
+        // 启动
+        loadMessages();
+    </script>
+</body>
+</html>
