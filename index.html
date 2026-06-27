@@ -53,8 +53,8 @@
 
     <script>
         // ===== 请替换成你自己的 Supabase 项目信息 =====
-        const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
-        const SUPABASE_KEY = 'YOUR_ANON_KEY';
+        const SUPABASE_URL = 'https://denytdtpgjvituxanphd.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_0oam9gPNEr24xu-KJq65fw_Chye0oZR';
         // ============================================
 
         const toast = document.getElementById('toast');
@@ -96,7 +96,11 @@
                     </div>
                 `).join('');
             } catch (err) {
-                container.innerHTML = `<div class="empty">😿 加载失败：${err.message}</div>`;
+                if (err.message && err.message.includes('PGRST205')) {
+                    container.innerHTML = `<div class="empty">📦 数据库表还没创建<br/><small>请在 Supabase SQL Editor 运行建表脚本</small></div>`;
+                } else {
+                    container.innerHTML = `<div class="empty">😿 加载失败：${err.message}</div>`;
+                }
             }
         }
 
